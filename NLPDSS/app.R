@@ -72,8 +72,11 @@ server <- function(input, output) {
   })
   # Generates the input for the size of the ngram in the term document matrix
   output$GenerateNgramsTDM<-renderUI({
-    numericInput('NgramsTDM','Ngram for Term Document Matrix',min=1,max=10,value=1)
-    
+    if(input$Tab!='FrequencyTable'){
+      numericInput('NgramsTDM','Ngram for Term Document Matrix',min=1,max=10,value=1)
+    }else{
+      numericInput('NgramsTDM','Ngrams to calculate frequency',min=1,max=10,value=1)
+    }
   })
   #If the tokenization method is a ngram creates an input  value to put the size of ngram
   output$Ngramgenerator<-renderUI({
@@ -142,6 +145,32 @@ server <- function(input, output) {
      
     # CompCloud(termdoc,MaxWords=N)
    })
+   
+   output$FrequencyTable<-renderDataTable({
+     Content=ReadFiles()
+     Text=unlist(Content)
+     Arguments=input$preprocesser
+     language=input$language
+     if('lower' %in% Arguments)
+      Text=tolower(Text)
+     if('punctuation' %in% Arguments)
+       Text=removePunctuation(Text)
+     #Texto=tm_map(Texto,removePunctuation)
+     if('numbers' %in% Arguments)
+       Text=removeNumbers(Text)
+     #Texto=tm_map(Texto,removeNumbers)
+     if('whitespace' %in% Arguments)
+       Text=stripWhitespace(Text)
+     #Texto=tm_map(Texto,stripWhitespace)
+     if('stopwords' %in% Arguments)
+       Text=removeWords(Text,words=stopwords(language))
+     #Text=TidyFormat(Text,'ngrams',input$ngrams)
+     Text=TidyFormat(Text,'ngrams',input$NgramsTDM)
+    # print(Text)
+     require(dplyr)
+     Frequency=Text %>% count(Text) %>% arrange(desc(n))
+     print(Frequency)
+   })
    ############################################################################## end of output definition
    
    ##############################################################################Code block to define reactive and eventReactive functions
@@ -203,7 +232,7 @@ server <- function(input, output) {
     return(GenerateLDA(matriz,input$NumberOfTopics) )
    })
    
-   
+
    
 #################### end of reactive and event reactive functions   
 }

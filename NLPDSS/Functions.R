@@ -174,7 +174,7 @@ return(x)
 
 
 
-Preprocessing<-function(Text,Arguments,language='en'){ #Arguments is a vector that contains lower,punctuation,numbers,whitespace,stopwords
+Preprocessing<-function(Text,Arguments,language='en',Corpus=TRUE){ #Arguments is a vector that contains lower,punctuation,numbers,whitespace,stopwords
 
 #Texto=VCorpus(VectorSource(Text))
 if('lower' %in% Arguments)
@@ -192,7 +192,8 @@ if('whitespace' %in% Arguments)
 if('stopwords' %in% Arguments)
 	#Texto=tm_map(Texto,removeWords,words=stopwords(language))
 	Text=removeWords(Text,words=stopwords(language))
-Texto=VCorpus(VectorSource(Text))
+if(Corpus)
+  Texto=VCorpus(VectorSource(Text))
 return(Texto)
 }
 
@@ -306,6 +307,8 @@ GenerateLDA<-function(dtm,topics=2){
 # Load the topicmodels package
 require(topicmodels)
 
+somatorio=apply(dtm,1,sum)  
+dtm=dtm[somatorio>0,]  
 # Run an LDA with 2 topics and a Gibbs sampler
 lda_out <- LDA(
   dtm,

@@ -16,7 +16,8 @@ menu<- dashboardSidebar(width = 250,
     sidebarMenu(id="Tab",
       menuItem("Network", tabName = "Network", icon = icon("dashboard")),
       menuItem("Topic Modelling", tabName = "TopicModelling", icon = icon("dashboard")),
-      menuItem("Word Clouds",tabName="WordCloudstab",icon=icon("dashboard")),
+      #menuItem("Word Clouds",tabName="WordCloudstab",icon=icon("dashboard")),
+      menuItem('Frequency Table',tabName = 'FrequencyTable',icon=icon('dashboard')),
 menuItem("About", tabName = "About", icon = icon("th"))
 
     ),
@@ -61,13 +62,22 @@ tabItem(tabName = "TopicModelling",
         )
       ),
 
-tabItem(tabName = "WordCloudstab",
-        fluidRow(
-	plotOutput('WordClouds')
+#tabItem(tabName = "WordCloudstab",
+ #       fluidRow(
+#	plotOutput('WordClouds')
 
           
+ #       )
+  #    ),
+
+
+tabItem(tabName = "FrequencyTable",
+        fluidRow(
+          dataTableOutput('FrequencyTable')
+          
+          
         )
-      ),
+),
 
 
 
