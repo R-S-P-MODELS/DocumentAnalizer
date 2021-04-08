@@ -47,6 +47,16 @@ server <- function(input, output) {
       downloadButton('ExportNetwork','Export Network as adjacency matrix')
     }
   })
+  
+  output$GenerateNormalizer<-renderUI({
+    if(input$Tab=="Network")
+      selectInput('Normalizer','Select normalization strategy for term document matrix',choices=c('none','tf-idf'))
+  })
+  
+  output$GenerateMaxWords<-renderUI({
+    numericInput('MaxWords','Maximum number of words to be considered after preprocessing',min = 10,max=1e5,value=1000)
+  })
+  
   #Download handler associated with the download button.
   output$ExportNetwork<-downloadHandler(
     filename = function() {
@@ -63,6 +73,12 @@ server <- function(input, output) {
   output$GeneratingPossibleLanguages<-renderUI({
     if('stopwords' %in% input$preprocesser)
         selectInput('language','Select language of the documents',choices=c('pt','en') )
+    
+  })
+  
+  output$GeneratingNewStopWords<-renderUI({
+    if('stopwords' %in% input$preprocesser)
+      textAreaInput('NewStopWords','Write additional stop words here separated by ,' )
     
   })
   #Generates the tokenization strategy, chosing an renderUI allows us to create a condition when there is a tab that does not require it
@@ -96,11 +112,14 @@ server <- function(input, output) {
       numericInput('NumberOfTopics',label = 'Number of topics to cluster',min=1,max=100,value = 2)
    })
    ################################################# end of input elements, beggining of output elements
+   GenerateAdjacencyListEvent<-eventReactive(input$Run,{
+     return(GenerateAdjacencyList() )
+   })
    
    #The following function creates the network visualization, it uses the ggraph package to deliver an graph visualization based on ggplot sintax
    #It receives the top n strongest links of the graph as an adjacency list, and builds the network object to plot it.
    output$SeeNetwork<-renderPlot({
-     AdjacencyList=GenerateAdjacencyList()
+     AdjacencyList=GenerateAdjacencyListEvent()
      require(igraph)
      require(ggraph)
      #m=m[m[,3]>1000,]
@@ -113,10 +132,16 @@ server <- function(input, output) {
      print(p)
      
    })
-   #This function plots the most important terms for each topic according to Latent dirichilet allocation (LDA)
-   output$LDA<-renderPlot({
+   
+   LdaEvent<-eventReactive(input$Run,{
      LDA=GenerateLDAReac()
      VisualizeLDA(LDA)
+   })
+   
+   
+   #This function plots the most important terms for each topic according to Latent dirichilet allocation (LDA)
+   output$LDA<-renderPlot({
+     LdaEvent()
    })
    #This function plots word clouds according to the algorithm of choice
    output$WordClouds<-renderPlot({
@@ -145,14 +170,14 @@ server <- function(input, output) {
      
     # CompCloud(termdoc,MaxWords=N)
    })
-   
-   output$FrequencyTable<-renderDataTable({
+    
+   ProcessarTexto<-reactive({
      Content=ReadFiles()
      Text=unlist(Content)
      Arguments=input$preprocesser
      language=input$language
      if('lower' %in% Arguments)
-      Text=tolower(Text)
+       Text=tolower(Text)
      if('punctuation' %in% Arguments)
        Text=removePunctuation(Text)
      #Texto=tm_map(Texto,removePunctuation)
@@ -162,14 +187,39 @@ server <- function(input, output) {
      if('whitespace' %in% Arguments)
        Text=stripWhitespace(Text)
      #Texto=tm_map(Texto,stripWhitespace)
-     if('stopwords' %in% Arguments)
-       Text=removeWords(Text,words=stopwords(language))
+     if('stopwords' %in% Arguments){
+       NewWords=unlist(strsplit(input$NewStopWords,split=",",fixed=TRUE)  )
+       RemovableWords=c(stopwords(language),NewWords)
+       Text=removeWords(Text,words=RemovableWords)
+     }
+     return(Text)
+     
+   })
+   
+   output$FrequencyTable<-renderDataTable({
+    Text=ProcessarTexto()
      #Text=TidyFormat(Text,'ngrams',input$ngrams)
      Text=TidyFormat(Text,'ngrams',input$NgramsTDM)
     # print(Text)
      require(dplyr)
      Frequency=Text %>% count(Text) %>% arrange(desc(n))
      print(Frequency)
+   })
+   
+   LimitMaxWords<-reactive({
+     Text=ProcessarTexto()
+     Text=TidyFormat(Text,'ngrams',input$NgramsTDM)
+     # print(Text)
+     require(dplyr)
+     Frequency=Text %>% count(Text) %>% arrange(desc(n))
+     #print(Frequency)
+     if(nrow(Frequency)<=input$MaxWords){
+       WordsToRemove=c()
+     }else{
+       WordsToRemove=Frequency$Text[ (input$MaxWords+1):nrow(Frequency)] #Aqui isolamos as palavras que não aparecem pelo menos que as k palavras mais frequentes
+     }
+     #print(WordsToRemove[1:3])
+     return(WordsToRemove)
    })
    ############################################################################## end of output definition
    
@@ -187,7 +237,7 @@ server <- function(input, output) {
     })
    #The following function takes text from multiple files and reorganizes then into a tibble which contains at each line the text in respect to the desired tokenization.
    #When tokenization is none each line of the document corresponds to a line in the tibble
-   FormatTextIntoTidy<-eventReactive(input$Run,{
+   FormatTextIntoTidy<-reactive({
      Content=ReadFiles()
      if(input$Tokenizer=='none'){
        for(i in 1:length(Content))
@@ -200,17 +250,49 @@ server <- function(input, output) {
      return(Text)
    })
    #The following function aims to preprocess the text according to preprocessing strategies inputted by the user, it returns a volatile corpus object to be fed to the term document matrix function
-   PreprocessedText<-eventReactive(input$Run,{
+   PreprocessedText<-reactive({
      TidiedText=FormatTextIntoTidy()
-     Preprocessed= Preprocessing(TidiedText$Text,input$preprocesser,input$language)
+     NewWords=unlist(strsplit(input$NewStopWords,split=",",fixed=TRUE)  )
+     Preprocessed= Preprocessing(TidiedText$Text,input$preprocesser,input$language,NewWords)
      return(Preprocessed)
    })
-   #The following function creates the term document matriz from the volatile corpus according to user parameters
-   TDM<-eventReactive(input$RunTDM,{
-     require(RWeka)
+   
+   CleanedText<-reactive({
      Text=PreprocessedText()
+     NewWordsToRemove=LimitMaxWords()
+     print(length(NewWordsToRemove))
+     print(length(unique(NewWordsToRemove)))
+     print(NewWordsToRemove[1:3])
+     WordsPerIteration=500
+     if(length(NewWordsToRemove)>0){
+       NumeroDeVezes=as.integer(length(NewWordsToRemove)/WordsPerIteration)
+       if(NumeroDeVezes>0){
+         withProgress(message = 'Removing Words', value = 0, {
+           
+           for (remocoes in 1:NumeroDeVezes){
+             Text=tm_map(Text,removeWords,words=NewWordsToRemove[ (1+(remocoes-1)*WordsPerIteration):(remocoes*WordsPerIteration) ])        
+             incProgress(1/NumeroDeVezes, detail = paste("Removed ", remocoes*WordsPerIteration,"Words."))
+             
+           }
+         })
+         #print(remocoes)
+         if(length(NewWordsToRemove)>(NumeroDeVezes*WordsPerIteration) )
+           Text=tm_map(Text,removeWords,words=NewWordsToRemove[(1+(remocoes)*WordsPerIteration):length(NewWordsToRemove) ])
+       }
+     }
+     
+     return(Text)
+     
+     
+     
+   })
+   #The following function creates the term document matriz from the volatile corpus according to user parameters
+   TDM<-reactive({
+     require(RWeka)
+     Text=CleanedText()
+      #Enquanto o bloco acima poderia ser apenas uma chamada de removewords passando todo o vetor de newwordstoremove, verificamos que quando este numero e muito grande ele gera uma expressão regular grande demais para que a função a processe, então resolvi fazer iterativamente.
      print(input$NgramsTDM)
-     Peso='tf-idf'
+     Peso=input$Normalizer
      if(input$Tab=='TopicModelling')
        Peso='None'
      TermDocMatrix=GenerateTDM(Text,input$NgramsTDM,Normalizacao=Peso )
@@ -218,7 +300,7 @@ server <- function(input, output) {
      return(TermDocMatrix)
    })
    #The following function generates an adjacency list with the strongest links and filters for links with no connection
-   GenerateAdjacencyList<-eventReactive(input$RunTDM,{
+   GenerateAdjacencyList<-reactive({
      TermDoc<-TDM()
      Adjacency<-WordNetworkList(TermDoc,input$NumberOfConnections)
      Adjacency=Adjacency[Adjacency[,3]>0,]
@@ -226,9 +308,9 @@ server <- function(input, output) {
    })
    
    #The following function calculates the latent dirichilet allocation algorithm on the term document matrix
-   GenerateLDAReac<-eventReactive(input$RunTDM,{
+   GenerateLDAReac<-reactive({
      matriz=TDM()
-     
+     matriz=matriz[apply(matriz,1,sum)>0,]
     return(GenerateLDA(matriz,input$NumberOfTopics) )
    })
    

@@ -23,16 +23,19 @@ menuItem("About", tabName = "About", icon = icon("th"))
     ),
 
        
-	uiOutput('RenderTokenizer'),
+	      uiOutput('RenderTokenizer'),
         uiOutput('Ngramgenerator'),
         selectInput('preprocesser','Select Preprocessing strategies',choices=c('lower','punctuation','numbers','whitespace','stopwords'),multiple=TRUE,selected = 'lower'),
         uiOutput('GeneratingPossibleLanguages'),
+        uiOutput('GeneratingNewStopWords'),
         uiOutput('GenerateNgramsTDM'),
         uiOutput('GenerateKindOfWordCloud'),
         uiOutput('GenerateNumberOfWordsInWordCloud'),
         #numericInput('NgramsTDM','Ngram for Term Document Matrix',min=1,max=10,value=1),
         uiOutput('GenerateNumberOfConnections'),
-        uiOutput('GenerateNumberOfTopics') #For LDA
+        uiOutput('GenerateNumberOfTopics'), #For LDA
+        uiOutput('GenerateMaxWords'),
+        uiOutput('GenerateNormalizer')
         #numericInput('NumberOfConnections','Maximum number of connections considered in the network',value=100,min=3,max=1e5),
                
   )
@@ -91,9 +94,9 @@ tabItem(tabName = "About",
 
       
     ),
-conditionalPanel(condition='input.tab!="About" ',
- 	actionButton('Run','Run preprocessing steps'),
-        actionButton('RunTDM','Run analysis on preprocessed data')
+conditionalPanel(condition='input.Tab!="About" ',
+ 	actionButton('Run','Run Analysis')
+        #actionButton('RunTDM','Run analysis on preprocessed data')
 ),
         uiOutput('GenerateExportNetwork')
 )

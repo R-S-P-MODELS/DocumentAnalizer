@@ -174,7 +174,7 @@ return(x)
 
 
 
-Preprocessing<-function(Text,Arguments,language='en',Corpus=TRUE){ #Arguments is a vector that contains lower,punctuation,numbers,whitespace,stopwords
+Preprocessing<-function(Text,Arguments,language='en',NewWords=c()){ #Arguments is a vector that contains lower,punctuation,numbers,whitespace,stopwords
 
 #Texto=VCorpus(VectorSource(Text))
 if('lower' %in% Arguments)
@@ -189,11 +189,14 @@ if('numbers' %in% Arguments)
 if('whitespace' %in% Arguments)
 	Text=stripWhitespace(Text)
 	#Texto=tm_map(Texto,stripWhitespace)
-if('stopwords' %in% Arguments)
+if('stopwords' %in% Arguments){
 	#Texto=tm_map(Texto,removeWords,words=stopwords(language))
-	Text=removeWords(Text,words=stopwords(language))
-if(Corpus)
-  Texto=VCorpus(VectorSource(Text))
+	#Text=removeWords(Text,words=stopwords(language))
+	#NewWords=unlist(strsplit(input$NewStopWords,split=",",fixed=TRUE)  )
+	RemovableWords=c(stopwords(language),NewWords)
+	Text=removeWords(Text,words=RemovableWords)
+}
+Texto=VCorpus(VectorSource(Text))
 return(Texto)
 }
 
@@ -231,47 +234,92 @@ return(Adjacencia)
 
 
 WordNetworkList<-function(tdm,max.words=100){
-#A tdm pode conter muitos elementos e a conversão para matriz estourar a memoria, para limitar isto eu extraio os indices nao nulos da matriz tdm que tende a ser esparsa e converto na matriz esparsa x
- require(Matrix) 
+  #A tdm pode conter muitos elementos e a conversão para matriz estourar a memoria, para limitar isto eu extraio os indices nao nulos da matriz tdm que tende a ser esparsa e converto na matriz esparsa x
+  require(Matrix) 
   x=sparseMatrix(i =tdm$i,j = tdm$j,x = tdm$v,dims=c(tdm$nrow,tdm$ncol) )
   x<-crossprod(x)
-#x=as.matrix(x)
-#PontoCorte=x[order(x,decreasing = TRUE)[max.words]]
-#x[x<PontoCorte]=0
-#Indices=which(x>0,arr.ind = TRUE)
-diag(x)=0 #Zeroing auto connections
-x1=x  
-l=list()
-withProgress(message = 'Finding Top k connections', value = 0, {
-for(i in 1:max.words){
-  maximo=max(x1)
-  ind=which(x1==maximo,arr.ind = TRUE)
-  if(nrow(ind)>1)
-    ind=ind[1,]
-  l[[i]]=ind
-  x1[ind[1],ind[2] ]=0
-  x1[ind[2],ind[1]  ]=0
-  incProgress(1/max.words, detail = paste("Found connection", i))
-}  
-} )
-Indices=do.call(rbind,l)
-#Adjacencia=data.frame(Source=1:max.words,Target=1:max.words,Weights=1:max.words)
-#Source=rownames(x)[Indices[,1]]
-
-#Aqui extraio a lista de adjacencias das top max.words conexoes, source e a origem, target o destino e weights o peso da conexão
-Source=tdm$dimnames$Terms[Indices[,1]]
-
-#Target=colnames(x)[Indices[,2]]
-Target=tdm$dimnames$Terms[Indices[,2]]
-
-Weights=c(x[Indices])
-Adjacencia=data.frame(Source,Target,Weights)
-#Adjacencia$Source=rownames(x)[Indices[,1]]
-#Adjacencia$Target=colnames(x)[Indices[,2]]
-#Adjacencia$Weights=c(x[Indices])
-#Adjacencia=x[unique(Indices[,1]),unique(Indices[,2] )] 
-return(Adjacencia)
+  #x=as.matrix(x)
+  #PontoCorte=x[order(x,decreasing = TRUE)[max.words]]
+  #x[x<PontoCorte]=0
+  #Indices=which(x>0,arr.ind = TRUE)
+  diag(x)=0 #Zeroing auto connections
+  x1=x  
+  l=list()
+  withProgress(message = 'Finding Top k connections', value = 0, {
+    for(i in 1:max.words){
+      maximo=max(x1)
+      ind=which(x1==maximo,arr.ind = TRUE)
+      if(nrow(ind)>1)
+        ind=ind[1,]
+      l[[i]]=ind
+      x1[ind[1],ind[2] ]=0
+      x1[ind[2],ind[1]  ]=0
+      incProgress(1/max.words, detail = paste("Found connection", i))
+    }  
+  } )
+  Indices=do.call(rbind,l)
+  #Adjacencia=data.frame(Source=1:max.words,Target=1:max.words,Weights=1:max.words)
+  #Source=rownames(x)[Indices[,1]]
+  
+  #Aqui extraio a lista de adjacencias das top max.words conexoes, source e a origem, target o destino e weights o peso da conexão
+  Source=tdm$dimnames$Terms[Indices[,1]]
+  
+  #Target=colnames(x)[Indices[,2]]
+  Target=tdm$dimnames$Terms[Indices[,2]]
+  
+  Weights=c(x[Indices])
+  Adjacencia=data.frame(Source,Target,Weights)
+  #Adjacencia$Source=rownames(x)[Indices[,1]]
+  #Adjacencia$Target=colnames(x)[Indices[,2]]
+  #Adjacencia$Weights=c(x[Indices])
+  #Adjacencia=x[unique(Indices[,1]),unique(Indices[,2] )] 
+  return(Adjacencia)
 }
+
+WordNetworkListNonShiny<-function(tdm,max.words=100){
+  #A tdm pode conter muitos elementos e a conversão para matriz estourar a memoria, para limitar isto eu extraio os indices nao nulos da matriz tdm que tende a ser esparsa e converto na matriz esparsa x
+  require(Matrix) 
+  x=sparseMatrix(i =tdm$i,j = tdm$j,x = tdm$v,dims=c(tdm$nrow,tdm$ncol) )
+  x<-crossprod(x)
+  #x=as.matrix(x)
+  #PontoCorte=x[order(x,decreasing = TRUE)[max.words]]
+  #x[x<PontoCorte]=0
+  #Indices=which(x>0,arr.ind = TRUE)
+  diag(x)=0 #Zeroing auto connections
+  x1=x  
+  l=list()
+
+    for(i in 1:max.words){
+      maximo=max(x1)
+      ind=which(x1==maximo,arr.ind = TRUE)
+      if(nrow(ind)>1)
+        ind=ind[1,]
+      l[[i]]=ind
+      x1[ind[1],ind[2] ]=0
+      x1[ind[2],ind[1]  ]=0
+
+    }  
+
+  Indices=do.call(rbind,l)
+  #Adjacencia=data.frame(Source=1:max.words,Target=1:max.words,Weights=1:max.words)
+  #Source=rownames(x)[Indices[,1]]
+  
+  #Aqui extraio a lista de adjacencias das top max.words conexoes, source e a origem, target o destino e weights o peso da conexão
+  Source=tdm$dimnames$Terms[Indices[,1]]
+  
+  #Target=colnames(x)[Indices[,2]]
+  Target=tdm$dimnames$Terms[Indices[,2]]
+  
+  Weights=c(x[Indices])
+  Adjacencia=data.frame(Source,Target,Weights)
+  #Adjacencia$Source=rownames(x)[Indices[,1]]
+  #Adjacencia$Target=colnames(x)[Indices[,2]]
+  #Adjacencia$Weights=c(x[Indices])
+  #Adjacencia=x[unique(Indices[,1]),unique(Indices[,2] )] 
+  return(Adjacencia)
+}
+
+
 
 WordNetworkListOld<-function(tdm,max.words=100){
   #A tdm pode conter muitos elementos e a conversão para matriz estourar a memoria, para limitar isto eu extraio os indices nao nulos da matriz tdm que tende a ser esparsa e converto na matriz esparsa x
@@ -302,13 +350,10 @@ WordNetworkListOld<-function(tdm,max.words=100){
 
 
 
-
 GenerateLDA<-function(dtm,topics=2){
 # Load the topicmodels package
 require(topicmodels)
 
-somatorio=apply(dtm,1,sum)  
-dtm=dtm[somatorio>0,]  
 # Run an LDA with 2 topics and a Gibbs sampler
 lda_out <- LDA(
   dtm,
